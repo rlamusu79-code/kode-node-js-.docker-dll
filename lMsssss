@@ -1,0 +1,140 @@
+Oke, saya buat langkah demi langkah supaya kamu paham COPY --from=builder itu bekerja bagaimana.
+
+1. Buat folder project
+
+Di PowerShell:
+
+mkdir belajar-docker
+cd belajar-docker
+2. Buat package.json
+notepad package.json
+
+Isi:
+
+{
+  "name": "my-node-app",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
+
+Kenapa pakai express?
+Supaya node_modules benar-benar dibuat.
+
+Save.
+
+3. Install dependency (node_modules)
+
+Di terminal:
+
+npm.cmd install
+
+Ini akan membuat:
+
+node_modules/
+package-lock.json
+
+Cek:
+
+dir
+4. Buat server.js
+notepad server.js
+
+Isi:
+
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+  res.send('Hello Rahmat!');
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy' });
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+
+Save.
+
+5. Buat Dockerfile
+notepad Dockerfile
+
+Isi:
+
+# Stage 1: Builder
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+# Stage 2: Final image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Salin node_modules dari builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Salin source code
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+6. Cara kerja COPY --from=builder
+
+Saat build:
+
+Stage 1 (builder)
+
+Docker menjalankan:
+
+RUN npm install
+
+Hasilnya:
+
+/app/node_modules
+
+berisi package express.
+
+Stage 2
+
+Docker menjalankan:
+
+COPY --from=builder /app/node_modules ./node_modules
+
+Artinya:
+
+ambil folder:
+/app/node_modules
+
+dari stage:
+builder
+
+copy ke:
+./node_modules
+
+jadi image final tidak perlu install ulang dependency.
+
+7. Build image
+docker build -t my-node-app .
+8. Jalankan container
+docker run -p 3001:3000 my-node-app
+
+Buka browser:
+
+http://localhost:3001
+
+Health:
+
+http://localhost:3001/health
+
+Ini contoh yang 100% cocok untuk memahami COPY --from=builder.
