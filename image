@@ -1,0 +1,71 @@
+Nah, ketemu masalahnya ✔
+
+Error:
+
+ExpiredTokenException
+The security token included in the request is expired
+
+artinya AWS credential/login kamu sudah expired (sering terjadi di lab/LKS AWS Academy).
+
+Makanya:
+
+password is empty
+
+karena AWS gagal mengambil token ECR login.
+
+Solusi: login ulang AWS CLI
+1. Cek credential sekarang
+
+Jalankan:
+
+aws sts get-caller-identity
+
+Kalau masih expired, akan error.
+
+2. Configure ulang AWS
+
+Jalankan:
+
+aws configure
+
+Masukkan ulang:
+
+AWS Access Key ID:
+AWS Secret Access Key:
+Default region name: ap-southeast-3
+Default output format: json
+
+Gunakan Access Key yang baru dari lab AWS, karena yang lama sudah expired.
+
+Kalau kamu pakai AWS Academy/Lab, biasanya harus:
+
+Buka lab
+Klik AWS Details / Show Credentials
+Copy:
+Access Key
+Secret Key
+Session Token (kalau ada)
+3. Kalau pakai temporary credentials (Lab/LKS)
+
+Harus set session token juga:
+
+aws configure set aws_access_key_id YOUR_ACCESS_KEY
+aws configure set aws_secret_access_key YOUR_SECRET_KEY
+aws configure set aws_session_token YOUR_SESSION_TOKEN
+aws configure set region ap-southeast-3
+
+Karena banyak lab AWS pakai temporary token, aws configure biasa kadang belum cukup.
+
+4. Tes lagi
+aws sts get-caller-identity
+
+Kalau berhasil muncul Account ID, berarti sudah aman.
+
+5. Baru login ECR lagi
+aws ecr get-login-password --region ap-southeast-3 | docker login --username AWS --password-stdin YOUR_ACCOUNT_ID.dkr.ecr.ap-southeast-3.amazonaws.com
+
+Harus muncul:
+
+Login Succeeded
+
+Kalau kamu pakai AWS Lab/LKS, kemungkinan besar ini cuma token expired karena lab lama/reset.
