@@ -1,0 +1,94 @@
+🌐 Cara Buat Domain di Route 53 (Step-by-Step)
+🥇 1. Masuk ke Route 53
+
+Buka AWS Console:
+
+Route 53 → Domains → Registered domains
+🥈 2. Register domain
+
+Klik:
+
+Register domain
+🥉 3. Cari nama domain
+
+Contoh:
+
+lks2026.com
+app-lks2026.com
+
+Klik:
+👉 Check availability
+
+💰 4. Pilih domain
+
+Kalau tersedia:
+
+pilih domain
+klik Add to cart
+📋 5. Isi data registrasi
+
+Isi:
+
+Name
+Email
+Address
+Phone number
+
+(ini wajib AWS)
+
+🧾 6. Confirm purchase
+
+Klik:
+
+Complete order
+
+⏳ Tunggu email verifikasi AWS
+
+🌍 7. Domain otomatis jadi Hosted Zone
+
+Setelah aktif, Route 53 akan otomatis membuat:
+
+Hosted Zone: lks2026.com
+⚙️ 8. Set DNS Record (untuk ACM / ALB)
+
+Masuk ke:
+
+Route 53 → Hosted Zones → lks2026.com
+
+Klik:
+👉 Create record
+
+🔐 Contoh untuk ACM (SSL validation)
+
+AWS akan kasih:
+
+CNAME Name  → _abc123.lks2026.com
+CNAME Value → _xyz.acm-validations.aws
+
+Tambahkan:
+
+Type: CNAME
+Name: _abc123
+Value: _xyz.acm-validations.aws
+🌐 Contoh untuk ALB
+Type: A (Alias)
+Alias target: ALB DNS name
+🔁 Alur lengkap (WAJIB paham LKS)
+1. Register domain (Route 53)
+2. Hosted Zone otomatis dibuat
+3. ACM request certificate
+4. DNS validation di Route 53
+5. ISSUED
+6. ALB pakai certificate
+7. Domain connect ke ALB
+⚠️ Penting di LKS
+
+❌ Domain belum aktif → ACM gagal
+❌ DNS tidak di Route 53 → harus manual add record
+❌ ACM belum ISSUED → ALB HTTPS error
+
+💡 Tips cepat
+
+✔ Route 53 = paling mudah untuk AWS SSL
+✔ Tidak perlu Freenom
+✔ Auto connect ke ACM (lebih cepat validasi)
