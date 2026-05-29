@@ -1,94 +1,181 @@
-🌐 Cara Buat Domain di Route 53 (Step-by-Step)
-🥇 1. Masuk ke Route 53
+erikut tata cara lengkap (end-to-end) sesuai gambar: ALB + SSL (ACM) + Auto Scaling + CloudFront (S3 + ALB) di AWS.
 
-Buka AWS Console:
+Saya buat urut dari nol sampai jalan.
 
-Route 53 → Domains → Registered domains
-🥈 2. Register domain
+🧱 1. Persiapan (Wajib sebelum mulai)
 
-Klik:
+Pastikan kamu sudah punya:
 
-Register domain
-🥉 3. Cari nama domain
+VPC (default juga boleh)
+Subnet Public & Private (minimal 2 AZ)
+Security Group
+Aplikasi Node.js kamu sudah siap (port misalnya 3000)
+AWS Account aktif
+🔐 2. Request SSL Certificate (ACM)
 
-Contoh:
+👉 Service: AWS Certificate Manager (ACM)
 
-lks2026.com
-app-lks2026.com
+Langkah:
 
-Klik:
-👉 Check availability
+Masuk ACM
+Klik Request Certificate
+Pilih: Public Certificate
+Masukkan domain:
+contoh: api.domainkamu.com
+Validation method: DNS validation
+Klik request
+🔑 Validasi DNS
+AWS akan kasih CNAME record
+Masuk ke domain provider (Route53 / Niagahoster / dll)
+Tambahkan CNAME itu
+Tunggu status jadi: ISSUED
+🎯 3. Buat Target Group
 
-💰 4. Pilih domain
+👉 Service: EC2 → Target Groups
 
-Kalau tersedia:
+Klik Create Target Group
+Pilih:
+Target type: Instances
+Protocol:
+HTTP
+Port: 3000
+Health Check:
+Path: /health
+Register target:
+pilih EC2 instance kamu (nanti bisa juga Auto Scaling)
+🖥️ 4. Buat EC2 (jika belum ada)
+Launch EC2 (Amazon Linux / Ubuntu)
+Install Node.js + app kamu
 
-pilih domain
-klik Add to cart
-📋 5. Isi data registrasi
+Pastikan app jalan:
 
-Isi:
+node app.js
+Pastikan security group:
+port 3000 open (dari ALB saja)
+⚖️ 5. Buat Application Load Balancer (ALB)
 
-Name
-Email
-Address
-Phone number
+👉 Service: EC2 → Load Balancers
 
-(ini wajib AWS)
+Klik Create Load Balancer
+Pilih: Application Load Balancer
+Setting:
+Scheme: Internet-facing
+IP: IPv4
+VPC: pilih VPC kamu
+Subnet: Public A & B
+Security Group ALB:
+Allow:
+HTTP 80
+HTTPS 443
+Listener default:
+HTTP (80)
+Target Group:
+pilih target group yang sudah dibuat
+🔒 6. Setup HTTPS (443)
 
-🧾 6. Confirm purchase
+Masuk ke ALB → Listener
 
-Klik:
+Add Listener:
+HTTPS : 443
+Pilih SSL Certificate dari ACM
+Default action:
+Forward ke Target Group
+🔁 Redirect HTTP → HTTPS
 
-Complete order
+Tambahkan rule:
 
-⏳ Tunggu email verifikasi AWS
+HTTP 80 → Redirect ke HTTPS 443
+📈 7. Auto Scaling Group (ASG)
 
-🌍 7. Domain otomatis jadi Hosted Zone
+👉 Service: EC2 → Auto Scaling
 
-Setelah aktif, Route 53 akan otomatis membuat:
+1. Launch Template
+AMI: Amazon Linux / Ubuntu
+Instance type: t2.micro / t3.micro
+User data (install node app otomatis)
+2. Buat ASG
+Attach Launch Template
+Attach ke Target Group
+3. Setting Scaling:
+Min capacity: 2
+Max capacity: 10
+4. Scaling Policy:
+Scale OUT:
+CPU > 70% → tambah 2 instance
+Scale IN:
+CPU < 30% → kurangi 1 instance
+Cooldown: 300 detik
+☁️ 8. Setup S3 (Static Asset)
 
-Hosted Zone: lks2026.com
-⚙️ 8. Set DNS Record (untuk ACM / ALB)
+👉 Service: Amazon S3
 
-Masuk ke:
+Create bucket:
+contoh: frontend-assets-kamu
+Upload:
+gambar
+css
+js frontend
+🌍 9. Setup CloudFront (CDN)
 
-Route 53 → Hosted Zones → lks2026.com
+👉 Service: Amazon CloudFront
 
-Klik:
-👉 Create record
+Origin 1: S3
+Origin domain: S3 bucket
+Untuk static file
+Origin 2: ALB
+Origin domain: DNS ALB kamu
+Untuk API / Node.js app
+Behavior CloudFront:
+/assets/* → S3
+/api/* → ALB
+Security:
+Enable:
+HTTPS Only
+Redirect HTTP → HTTPS
+🌐 10. Domain (Optional tapi disarankan)
 
-🔐 Contoh untuk ACM (SSL validation)
+👉 Route53
 
-AWS akan kasih:
+Create Hosted Zone
+Add record:
+A record → CloudFront
+API record → ALB
+🧪 11. Testing
 
-CNAME Name  → _abc123.lks2026.com
-CNAME Value → _xyz.acm-validations.aws
+Coba akses:
 
-Tambahkan:
+ALB langsung:
+http://alb-dns
+https://alb-dns
+CloudFront:
+https://domain-kamu.com
 
-Type: CNAME
-Name: _abc123
-Value: _xyz.acm-validations.aws
-🌐 Contoh untuk ALB
-Type: A (Alias)
-Alias target: ALB DNS name
-🔁 Alur lengkap (WAJIB paham LKS)
-1. Register domain (Route 53)
-2. Hosted Zone otomatis dibuat
-3. ACM request certificate
-4. DNS validation di Route 53
-5. ISSUED
-6. ALB pakai certificate
-7. Domain connect ke ALB
-⚠️ Penting di LKS
+Cek:
 
-❌ Domain belum aktif → ACM gagal
-❌ DNS tidak di Route 53 → harus manual add record
-❌ ACM belum ISSUED → ALB HTTPS error
+API jalan
+SSL aktif
+Auto scaling nambah instance
+Static file dari S3 cepat
+🚨 12. Checklist kalau error
+Instance health check healthy?
+Port 3000 terbuka di EC2?
+ALB security group benar?
+ACM status sudah ISSUED?
+Target group registered?
+🧠 Arsitektur akhir (ringkas)
+User
+ ↓
+CloudFront
+ ├── S3 (static frontend)
+ └── ALB (API Node.js)
+        ↓
+   Auto Scaling EC2
 
-💡 Tips cepat
+Kalau kamu mau, saya bisa lanjutkan:
 
-✔ Route 53 = paling mudah untuk AWS SSL
-✔ Tidak perlu Freenom
-✔ Auto connect ke ACM (lebih cepat validasi)
+✅ 
+bikin step-by-step CLI + Terraform
+✅ atau 
+cara deploy Node.js ke EC2 auto scaling (otomatis install + run)
+✅ atau 
+debug kalau ALB kamu belum health check (sering error)
