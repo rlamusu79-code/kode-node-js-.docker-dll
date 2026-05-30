@@ -69,3 +69,397 @@ Harus muncul:
 Login Succeeded
 
 Kalau kamu pakai AWS Lab/LKS, kemungkinan besar ini cuma token expired karena lab lama/reset.
+
+Baik, sekarang saya buatkan tata cara lengkap Deploy ke ECS Fargate (sesuai Modul A/B kamu) step-by-step sampai aplikasi Node.js jalan lewat ALB.
+
+Kita asumsikan:
+
+✅ Docker image sudah ada di ECR
+✅ ALB sudah dibuat
+✅ VPC + Private Subnet sudah ada
+✅ App Node.js jalan di port 3000
+
+Target akhir:
+
+ALB
+ ↓
+ECS Service
+ ↓
+Fargate Task (2 task)
+ ↓
+Node.js app port 3000
+STEP 1 — Buat CloudWatch Log Group
+
+Supaya log aplikasi muncul.
+
+Masuk:
+
+CloudWatch → Log groups → Create
+
+Nama:
+
+/ecs/lks2026-app
+
+Retention:
+
+7 days
+
+Create.
+
+STEP 2 — Buat ECS Cluster
+
+Masuk:
+
+ECS → Clusters
+
+Klik:
+
+Create Cluster
+Cluster configuration
+
+Cluster name:
+
+lks2026-cluster
+
+Infrastructure:
+
+AWS Fargate (serverless)
+
+Klik:
+
+Create
+
+Tunggu selesai.
+
+STEP 3 — Buat Task Definition
+
+Masuk:
+
+ECS → Task Definitions
+
+Klik:
+
+Create new task definition
+Launch type
+
+Pilih:
+
+AWS Fargate
+Task Definition Family
+
+Isi:
+
+lks2026-task
+Infrastructure requirements
+
+Operating system:
+
+Linux/X86_64
+CPU & Memory
+
+CPU:
+
+0.5 vCPU
+
+Memory:
+
+1 GB
+STEP 4 — Container Configuration
+
+Klik:
+
+Add Container
+Container Name
+
+Isi:
+
+lks2026-app
+Image URI
+
+Masuk ECR.
+
+Copy URI image.
+
+Contoh:
+
+123456789012.dkr.ecr.ap-southeast-3.amazonaws.com/lks2026-app:latest
+
+Paste ke image URI.
+
+Essential container
+
+Biarkan:
+
+ON
+Port Mapping
+
+Container port:
+
+3000
+
+Protocol:
+
+TCP
+STEP 5 — Setup Logging
+
+Scroll ke:
+
+Log collection
+
+Pilih:
+
+Use CloudWatch Logs
+Log Group
+
+Isi:
+
+/ecs/lks2026-app
+Stream prefix
+
+Isi:
+
+ecs
+
+Klik:
+
+Create
+
+Task Definition selesai.
+
+STEP 6 — Buat ECS Service
+
+Masuk:
+
+ECS
+→ Clusters
+→ lks2026-cluster
+
+Klik:
+
+Create Service
+Environment
+
+Launch type:
+
+FARGATE
+Task Definition
+
+Pilih:
+
+lks2026-task
+
+Revision:
+
+latest.
+
+Service Name
+
+Isi:
+
+lks2026-service
+Desired Tasks
+
+Isi:
+
+2
+
+Kenapa 2?
+
+Untuk:
+
+High Availability (HA)
+
+Kalau 1 task mati, task lain tetap jalan.
+
+STEP 7 — Networking
+
+VPC:
+
+Pilih:
+
+vpc-lks-2026
+Subnets
+
+Pilih:
+
+Private Subnet A
+Private Subnet B
+
+Minimal beda AZ.
+
+Contoh:
+
+ap-southeast-3a
+ap-southeast-3b
+Security Group
+
+Pilih ECS Security Group.
+
+Inbound rule harus ada:
+
+TCP 3000
+Source = ALB Security Group
+
+JANGAN:
+
+0.0.0.0/0
+
+Karena ECS private subnet.
+
+Public IP
+
+Pilih:
+
+DISABLED
+
+Karena private subnet.
+
+STEP 8 — Load Balancer
+
+Centang:
+
+Use load balancing
+
+Load balancer type:
+
+Application Load Balancer
+
+Pilih ALB kamu.
+
+Listener
+
+Pilih:
+
+443
+
+atau:
+
+80
+Target Group
+
+Pilih:
+
+lks2026-target-group
+Container mapping
+
+Container:
+
+lks2026-app:3000
+STEP 9 — Deployment Settings
+
+Deployment type:
+
+Rolling update
+
+Atau kalau nanti Blue/Green:
+
+CodeDeploy
+
+Minimum healthy:
+
+100%
+
+Maximum:
+
+200%
+
+Klik:
+
+Create Service
+
+Tunggu 2–5 menit.
+
+STEP 10 — Verifikasi Task Running
+
+Masuk:
+
+Cluster
+→ Services
+→ Tasks
+
+Harus muncul:
+
+RUNNING (2)
+
+Kalau:
+
+PENDING
+
+tunggu.
+
+Kalau:
+
+STOPPED
+
+berarti error.
+
+STEP 11 — Cek CloudWatch Logs
+
+Masuk:
+
+CloudWatch
+→ Log groups
+→ /ecs/lks2026-app
+
+Harus ada log:
+
+Server running
+
+atau
+
+Listening on port 3000
+
+Kalau kosong → container crash.
+
+STEP 12 — Test ALB
+
+Masuk:
+
+EC2
+→ Load Balancer
+
+Copy:
+
+DNS Name
+
+Contoh:
+
+http://xxxx.ap-southeast-3.elb.amazonaws.com
+
+Buka browser.
+
+Harus muncul:
+
+LKS 2026 Running
+STEP 13 — Kalau Health Check Merah
+
+Masuk:
+
+Target Group
+→ Health checks
+
+Path:
+
+/health
+
+Node.js wajib punya:
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
+Kalau tidak ada:
+
+Unhealthy
+Checklist Sukses
+
+Harus seperti ini:
+
+Cluster = Active
+Task = Running (2)
+Target Group = Healthy
+ALB = Active
+CloudWatch Logs = muncul
+Browser via ALB = bisa dibuka
+
+Kalau kamu sudah sampai halaman Create Service ECS, kirim screenshot, nanti saya tunjuk bagian mana yang harus diisi satu per satu supaya tidak salah.
